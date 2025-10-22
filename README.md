@@ -9,7 +9,7 @@
 
   - evidencia de enrutamiento
  ![alt text](imagenes/enr2.png)
- ![alt text](imagenes/image-enr1.png)
+ ![alt text](imagenes/enr1.png)
 
  - Creación del servicio
  ![alt text](imagenes/image.png)
