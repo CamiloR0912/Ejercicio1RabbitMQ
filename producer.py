@@ -2,63 +2,59 @@ import pika
 import json
 import random
 import time
+import sys
 
 def create_tasks():
-    """Genera 10 tareas con niveles de complejidad aleatorios (1-5 segundos)"""
     tasks = []
+    priorities = ['low', 'medium', 'high']
+    
     for i in range(1, 11):
         complexity = random.randint(1, 5)
+        priority = random.choice(priorities)
+        
         task = {
             'task_id': i,
             'complexity': complexity,
+            'priority': priority,
             'description': f'Tarea de análisis #{i}'
         }
         tasks.append(task)
     return tasks
 
-def publish_tasks():
-    """Publica las tareas en la cola de RabbitMQ"""
-    # Conexión a RabbitMQ
+def publish_tasks(exchange_name='task_router'):
     connection = pika.BlockingConnection(
-    pika.ConnectionParameters(host="localhost", port=5672,
-                              credentials=pika.PlainCredentials("user", "password"))
+        pika.ConnectionParameters(host="localhost", port=5672,
+                                  credentials=pika.PlainCredentials("user", "password"))
     )
     channel = connection.channel()
     
-    # Declarar la cola con durabilidad
-    channel.queue_declare(queue='tareas_distribuidas', durable=True)
+    channel.exchange_declare(exchange=exchange_name, exchange_type='direct', durable=True)
     
-    # Generar tareas
     tasks = create_tasks()
     
-    print("=== PRODUCTOR INICIADO ===")
-    print(f"Generando {len(tasks)} tareas...\n")
+    print(f"Publicando {len(tasks)} tareas en el exchange '{exchange_name}'...\n")
     
-    # Publicar cada tarea
     for task in tasks:
         message = json.dumps(task)
+        priority = task['priority']
         
         channel.basic_publish(
-            exchange='',
-            routing_key='tareas_distribuidas',
+            exchange=exchange_name,
+            routing_key=priority,
             body=message,
-            properties=pika.BasicProperties(
-                delivery_mode=2,  # Hacer el mensaje persistente
-            )
+            properties=pika.BasicProperties(delivery_mode=2)
         )
         
-        print(f"✓ Tarea #{task['task_id']} publicada - Complejidad: {task['complexity']}s")
-        time.sleep(0.1)  # Pequeña pausa para visualización
-    
-    print(f"\n✓ Todas las tareas han sido enviadas a la cola")
-    print(f"✓ Total de tareas: {len(tasks)}")
+        print(f"Tarea #{task['task_id']} - Prioridad: {priority} - Complejidad: {task['complexity']}s")
+        time.sleep(0.1)
     
     connection.close()
 
 if __name__ == '__main__':
     try:
-        publish_tasks()
+        exchange = sys.argv[1] if len(sys.argv) > 1 else 'task_router'
+        publish_tasks(exchange)
     except KeyboardInterrupt:
-        print('\n\nProductor interrumpido por el usuario')
+        print('\nProductor interrumpido')
     except Exception as e:
-        print(f'\nError: {e}')
+        print(f'Error: {e}')
